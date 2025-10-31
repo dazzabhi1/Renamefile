@@ -1,7 +1,19 @@
 # ===================================================================
-# ==       PDF Folder & File Renamer (v4 - Syntax Fixed)         ==
-# ==  (Extracts, renames folders, and renames files based on rules) ==
+# ==       PDF Folder & File Renamer (v5 - Config Info)          ==
 # ===================================================================
+#
+# IMPORTANT NOTE FOR LARGE FILES (> 200MB):
+# By default, Streamlit limits file uploads to 200MB. To increase this,
+# create a folder named `.streamlit` in the same directory as this script.
+# Inside that folder, create a file named `config.toml` and add:
+#
+# [server]
+# maxUploadSize = 500  # Sets the limit to 500MB
+#
+# Then, restart the Streamlit app.
+#
+# ===================================================================
+
 import streamlit as st
 import os
 import zipfile
@@ -26,6 +38,8 @@ with st.sidebar:
     st.header('1. Upload Your Data')
     st.write("Upload a .zip file containing your 'AC' folders.")
     uploaded_zip = st.file_uploader("Upload Data (.zip)", type="zip")
+    # New caption to manage user expectations
+    st.caption("Note: Large file uploads may take a moment. For files > 200MB, the server configuration must be updated (see script comments for instructions).")
 
 # --- Main Application Area ---
 st.header('2. Run the Renaming Process')
@@ -132,7 +146,7 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
         st.header("3. Download Your Renamed Data")
         with st.spinner("Zipping results for download..."):
             zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) a_file:
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
@@ -147,5 +161,4 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
             type="primary"
         )
 else:
-    # This is the line that was fixed.
     st.info("Please upload a zip file to begin the renaming process.")
