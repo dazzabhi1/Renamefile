@@ -1,5 +1,6 @@
 # ===================================================================
-# ==       PDF Folder & File Renamer (v6 - Final Syntax Fix)     ==
+# ==     PDF Folder & File Renamer (v7 - Final with Sorting)     ==
+# ==  (Sorts files numerically by AC and PS code before zipping)   ==
 # ===================================================================
 #
 # IMPORTANT NOTE FOR LARGE FILES (> 200MB):
@@ -29,7 +30,8 @@ st.info(
     """
     **Purpose:** This tool automates the renaming of specific folders and PDF files within a zip archive.
     - **Folder Renaming:** Finds folders like `AC001`, `AC002` and renames them to `1`, `2`.
-    - **File Renaming (Corrected Logic):** Renames `S03A0010095.pdf` to `S03_1_95.pdf`.
+    - **File Renaming:** Renames `S03A0010095.pdf` to `S03_1_95.pdf`.
+    - **Final Zip Sorting:** Files in the downloaded `.zip` will be sorted numerically by Assembly and Polling Station number.
     """
 )
 
@@ -61,7 +63,6 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
             st.success(f"Zip extracted. Found single base folder: `{os.path.basename(base_path)}`")
         else:
             st.success("Zip extracted. Found multiple items at the root.")
-        
         st.markdown("---")
 
         # --- INITIAL SCAN REPORT ---
@@ -72,8 +73,8 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
                 total_dirs += len(dirs)
                 total_files += len(files)
             col1, col2 = st.columns(2)
-            col1.metric("Total Folders Found (in all subdirectories)", f"{total_dirs:,}")
-            col2.metric("Total Files Found (in all subdirectories)", f"{total_files:,}")
+            col1.metric("Total Folders Found", f"{total_dirs:,}")
+            col2.metric("Total Files Found", f"{total_files:,}")
         st.markdown("---")
         
         # --- 2. RENAME FOLDERS ---
@@ -103,7 +104,7 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
         st.success(f"Folder renaming complete. Renamed {folders_renamed_count} folders.")
         st.markdown("---")
 
-        # --- 3. RENAME PDF FILES (WITH CORRECTED LOGIC) ---
+        # --- 3. RENAME PDF FILES ---
         st.subheader("Part 2: Renaming PDF Files")
         files_renamed_count = 0
         final_renamed_paths = list(renamed_folder_map.values())
@@ -118,17 +119,10 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
                 for filename in os.listdir(folder_path):
                     if filename.lower().endswith('.pdf'):
                         match = re.match(r'^(S\d{2})A(\d{3})(\d{4})\.pdf$', filename, re.IGNORECASE)
-                        
                         if match:
-                            part1 = match.group(1).upper()
-                            part2_num = int(match.group(2))
-                            part3_num = int(match.group(3))
-                            
+                            part1, part2_num, part3_num = match.group(1).upper(), int(match.group(2)), int(match.group(3))
                             new_filename = f"{part1}_{part2_num}_{part3_num}.pdf"
-                            
-                            old_file_path = os.path.join(folder_path, filename)
-                            new_file_path = os.path.join(folder_path, new_filename)
-                            
+                            old_file_path, new_file_path = os.path.join(folder_path, filename), os.path.join(folder_path, new_filename)
                             try:
                                 os.rename(old_file_path, new_file_path)
                                 st.write(f"  - ✔️ Renamed File: `{filename}` → `{new_filename}`")
@@ -137,28 +131,48 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
                                 st.warning(f"  - ⚠️ Could not rename file `{filename}`: {e}")
                         else:
                             st.write(f"  - Skipping file `{filename}` (pattern not matched).")
-        
         st.success(f"File renaming complete. Renamed {files_renamed_count} PDF files.")
         st.markdown("---")
 
-        # --- 4. ZIPPING and DOWNLOAD ---
+        # --- 4. ZIPPING and DOWNLOAD (WITH NUMERICAL SORTING) ---
         st.header("3. Download Your Renamed Data")
-        with st.spinner("Zipping results for download..."):
+        with st.spinner("Collecting and sorting files for zipping..."):
+            
+            # --- [NEW] Custom sorting function ---
+            def get_sort_key(filepath):
+                filename = os.path.basename(filepath)
+                # This regex matches the NEW filename format (e.g., S03_1_95.pdf)
+                match = re.search(r'^S\d{2}_(\d+)_(\d+)\.pdf$', filename, re.IGNORECASE)
+                if match:
+                    ac_number = int(match.group(1)) # The Assembly Code number
+                    ps_number = int(match.group(2)) # The Polling Station number
+                    # Sort by AC first, then by PS
+                    return (ac_number, ps_number)
+                else:
+                    # If the file doesn't match, place it at the end, sorted alphabetically
+                    return (float('inf'), filename)
+
+            # Collect all file paths first
+            all_file_paths = []
+            for root, _, files in os.walk(temp_dir):
+                for file in files:
+                    all_file_paths.append(os.path.join(root, file))
+            
+            # Sort the list of paths using our custom key
+            all_file_paths.sort(key=get_sort_key)
+
+        with st.spinner("Zipping sorted results..."):
             zip_buffer = BytesIO()
-            # ======================= SYNTAX FIX IS HERE =======================
-            # Changed the typo "a_file" back to the correct "as zip_file"
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # ==================================================================
-                for root, _, files in os.walk(temp_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        archive_name = os.path.relpath(file_path, temp_dir)
-                        zip_file.write(file_path, archive_name)
+                # Iterate through the PRE-SORTED list of files
+                for file_path in all_file_paths:
+                    archive_name = os.path.relpath(file_path, temp_dir)
+                    zip_file.write(file_path, archive_name)
 
         st.download_button(
             label="📥 Download Renamed Data (.zip)",
             data=zip_buffer,
-            file_name="renamed_folders_and_files.zip",
+            file_name="renamed_folders_and_files_sorted.zip",
             mime="application/zip",
             type="primary"
         )
