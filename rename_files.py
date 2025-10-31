@@ -1,5 +1,5 @@
 # ===================================================================
-# ==       PDF Folder & File Renamer (v5 - Config Info)          ==
+# ==       PDF Folder & File Renamer (v6 - Final Syntax Fix)     ==
 # ===================================================================
 #
 # IMPORTANT NOTE FOR LARGE FILES (> 200MB):
@@ -38,7 +38,6 @@ with st.sidebar:
     st.header('1. Upload Your Data')
     st.write("Upload a .zip file containing your 'AC' folders.")
     uploaded_zip = st.file_uploader("Upload Data (.zip)", type="zip")
-    # New caption to manage user expectations
     st.caption("Note: Large file uploads may take a moment. For files > 200MB, the server configuration must be updated (see script comments for instructions).")
 
 # --- Main Application Area ---
@@ -146,7 +145,10 @@ if st.button('🚀 Start Renaming', type="primary", disabled=(not uploaded_zip))
         st.header("3. Download Your Renamed Data")
         with st.spinner("Zipping results for download..."):
             zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) a_file:
+            # ======================= SYNTAX FIX IS HERE =======================
+            # Changed the typo "a_file" back to the correct "as zip_file"
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # ==================================================================
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
